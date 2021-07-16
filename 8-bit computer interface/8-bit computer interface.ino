@@ -8,9 +8,9 @@
  *** Much of this code can be improved for better efficiency, adherence to coding standards,
  general elegance, etc. This version is the initial prototype.
 
- ******************************************************
- *** This is provided as-is. Use at your own risk! ****
- ******************************************************
+ ***********************************************************
+ *** This code is provided as-is. Use at your own risk! ****
+ ***********************************************************
  
  Reference wiring diagram. Ensure Arduino ground is connected to ground on the 8-bit computer.
  
@@ -49,6 +49,7 @@
 #define PIN_CONTROL_COUNTER_ENABLE 41		//Program counter ENABLE
 #define PIN_CONTROL_COUNTER_OUT 43			//Program counter OUT
 #define PIN_CONTROL_JUMP 45					//Jump
+#define PIN_CONTROL_FLAGS 22				//Flags
 
 #define PIN_LED_OUT_128	9					//Value 128 for output LED segment display
 #define PIN_LED_OUT_64	8					//Value 64 for output LED segment display
@@ -102,6 +103,7 @@ int valControlOutputIn = 0;
 int valControlCounterEnable = 0;
 int valControlCounterOut = 0;
 int valControlJump = 0;
+int valControlFlags = 0;
 
 int valLEDout128 = 0;
 int valLEDout64 = 0;
@@ -138,6 +140,7 @@ int valControlOutputIn_prev = 0;
 int valControlCounterEnable_prev = 0;
 int valControlCounterOut_prev = 0;
 int valControlJump_prev = 0;
+int valControlFlags_prev = 0;
 
 int valLEDout128_prev = 0;
 int valLEDout64_prev = 0;
@@ -178,6 +181,7 @@ void setup() {
 	pinMode(PIN_CONTROL_COUNTER_ENABLE, INPUT);
 	pinMode(PIN_CONTROL_COUNTER_OUT, INPUT);
 	pinMode(PIN_CONTROL_JUMP, INPUT);
+	pinMode(PIN_CONTROL_FLAGS, INPUT);
 
 	pinMode(PIN_LED_OUT_128, INPUT);
 	pinMode(PIN_LED_OUT_64, INPUT);
@@ -276,6 +280,7 @@ void startMonitor()
 	valControlCounterEnable = digitalRead(PIN_CONTROL_COUNTER_ENABLE);
 	valControlCounterOut = digitalRead(PIN_CONTROL_COUNTER_OUT);
 	valControlJump = digitalRead(PIN_CONTROL_JUMP);
+	valControlFlags = digitalRead(PIN_CONTROL_FLAGS);
 
 	valLEDout128 = digitalRead(PIN_LED_OUT_128);
 	valLEDout64 = digitalRead(PIN_LED_OUT_64);
@@ -311,6 +316,7 @@ void startMonitor()
 			valControlCounterEnable_prev != valControlCounterEnable ||
 			valControlCounterOut_prev != valControlCounterOut ||
 			valControlJump_prev != valControlJump ||
+			valControlFlags_prev != valControlFlags ||
 			valLEDout128_prev != valLEDout128 ||
 			valLEDout64_prev != valLEDout64 ||
 			valLEDout32_prev != valLEDout32 ||
@@ -348,6 +354,7 @@ void startMonitor()
 		Serial.print(valControlCounterEnable);
 		Serial.print(valControlCounterOut);
 		Serial.print(valControlJump);
+		Serial.print(valControlFlags);
 
 		getBinaryOutput();
 		Serial.print("  Out:");
@@ -382,6 +389,7 @@ void startMonitor()
 		valControlCounterEnable_prev = valControlCounterEnable;
 		valControlCounterOut_prev = valControlCounterOut;
 		valControlJump_prev = valControlJump;
+		valControlFlags_prev = valControlFlags;
 
 		valLEDout128_prev = valLEDout128;
 		valLEDout64_prev = valLEDout64;
