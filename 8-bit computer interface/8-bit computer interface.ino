@@ -1,8 +1,8 @@
 /*
  Name:				8-bit-computer-interface.ino
- Created:			12 July 2021
+ Created:			19 July 2021
  Author:			rehsd
- Version:			0.01
+ Version:			0.02
  Target Arduino:	Mega 2560
  
  *** Much of this code can be improved for better efficiency, adherence to coding standards,
@@ -24,6 +24,8 @@
  -Set clock mode switch to automatic
  -Set memory program mode switch to dsiable
 */
+
+#include<Wire.h>
 
 #define PIN_BUS1 23							//PIN1 (far left) of Bus
 #define PIN_BUS2 25
@@ -51,14 +53,14 @@
 #define PIN_CONTROL_JUMP 45					//Jump
 #define PIN_CONTROL_FLAGS 22				//Flags
 
-#define PIN_LED_OUT_128	9					//Value 128 for output LED segment display
-#define PIN_LED_OUT_64	8					//Value 64 for output LED segment display
-#define PIN_LED_OUT_32	7					//Value 32 for output LED segment display
-#define PIN_LED_OUT_16	6					//Value 16 for output LED segment display
-#define PIN_LED_OUT_8	5					//Value 8 for output LED segment display
-#define PIN_LED_OUT_4	4					//Value 4 for output LED segment display
-#define PIN_LED_OUT_2	3					//Value 2 for output LED segment display
-#define PIN_LED_OUT_1	2					//Value 1 for output LED segment display
+#define PIN_LED_OUT_128	A7	//9					//Value 128 for output LED segment display
+#define PIN_LED_OUT_64	A6	//8					//Value 64 for output LED segment display
+#define PIN_LED_OUT_32	A5	//7					//Value 32 for output LED segment display
+#define PIN_LED_OUT_16	A4	//6					//Value 16 for output LED segment display
+#define PIN_LED_OUT_8	A3	//5					//Value 8 for output LED segment display
+#define PIN_LED_OUT_4	A2	//4					//Value 4 for output LED segment display
+#define PIN_LED_OUT_2	A1	//3					//Value 2 for output LED segment display
+#define PIN_LED_OUT_1	A0	//2					//Value 1 for output LED segment display
 
 #define PIN_SET_RAM		A15					//Program RAM button
 #define PIN_RAM_128		44					//Pins for setting bits for writing to RAM
@@ -74,10 +76,13 @@
 #define PIN_RAM_ADDR_2	51
 #define PIN_RAM_ADDR_1	53
 
+#define PIN_CLOCK		2					//Pin for clock from 555 IC
+
 const String COMMAND_LDA = "0001";
 const String COMMAND_ADD = "0010";
 const String COMMAND_OUT = "1110";
 const String COMMAND_HLT = "1111";
+//TODO fill in the rest of these constants...
 
 int valBus1 = 0;
 int valBus2 = 0;
@@ -113,8 +118,7 @@ int valLEDout8 = 0;
 int valLEDout4 = 0;
 int valLEDout2 = 0;
 int valLEDout1 = 0;
-
-char outputString[8]{'0','0','0','0','0','0','0','0'};
+volatile char outputString[8]{'0','0','0','0','0','0','0','0'};
 
 int valBus1_prev = 0;
 int valBus2_prev = 0;
@@ -153,9 +157,11 @@ int valLEDout1_prev = 0;
 
 String setRAMCustomNewVals = "";
 
+bool bMonitor = false;
+volatile long int currentClockSpeed = 0;
+
 void setup() {
-	Serial.println("\n\nLoading...\n");
-	Serial.begin(115200); 
+	//Serial.println("\n\nLoading...\n");
 	
 	pinMode(PIN_BUS1, INPUT);
 	pinMode(PIN_BUS2, INPUT);
@@ -206,7 +212,38 @@ void setup() {
 	pinMode(PIN_RAM_ADDR_1, OUTPUT);
 	pinMode(PIN_SET_RAM, OUTPUT);			//to physical set RAM button on board
 
+	pinMode(PIN_CLOCK, INPUT);
+	//pinMode(PIN_CLOCK2, INPUT);
+
+	attachInterrupt(digitalPinToInterrupt(PIN_CLOCK), onClock, RISING);
+	//attachInterrupt(digitalPinToInterrupt(PIN_CLOCK2), onClock2, RISING);
+
+	Serial.begin(115200);
+
+	Wire.begin(9);
+	Wire.onReceive(receiveEvent);
 }
+
+void receiveEvent(int bytes)
+{
+	//Used to receive clock data on SCL/SDA
+
+	//Serial.print("\tevent\t");
+	byte a[2];
+	int sumBoth;
+	Wire.readBytes(a, 2);
+	//b = Wire.read();
+
+	sumBoth = a[0];
+	sumBoth = (sumBoth << 8) | a[1];
+
+	//Serial.print(sumBoth);
+
+	currentClockSpeed = sumBoth;
+	//Serial.print(currentClockSpeed);
+
+}
+
 
 void loop() {
 	String mySelection;
@@ -238,14 +275,17 @@ void loop() {
 	}
 	else if (mySelection == "M" || mySelection == "m")
 	{
-		Serial.println("Starting monitor...\n (Press x\Enter to exit monitor)\n");
+		Serial.println("Starting monitor...\n (Press 'x' and 'Enter' to exit monitor)\n");
+		//bMonitor = true;
+
 		while (Serial.available() == 0)
 		{
-			startMonitor();
+			bMonitor = true;
 		}
 	}
 	else if (mySelection == "X" || mySelection == "x")
 	{
+		bMonitor = false;
 		Serial.println("Monitoring stopped");
 	}
 	else
@@ -254,153 +294,70 @@ void loop() {
 	}
 }
 
-void startMonitor()
-{
-	valBus1 = digitalRead(PIN_BUS1);
-	valBus2 = digitalRead(PIN_BUS2);
-	valBus3 = digitalRead(PIN_BUS3);
-	valBus4 = digitalRead(PIN_BUS4);
-	valBus5 = digitalRead(PIN_BUS5);
-	valBus6 = digitalRead(PIN_BUS6);
-	valBus7 = digitalRead(PIN_BUS7);
-	valBus8 = digitalRead(PIN_BUS8);
 
-	valControlHalt = digitalRead(PIN_CONTROL_HALT);
-	valControlMemoryAddressIn = digitalRead(PIN_CONTROL_MEMORY_ADDRESS_IN);
-	valControlRamIn = digitalRead(PIN_CONTROL_RAM_IN);
-	valControlRamOut = digitalRead(PIN_CONTROL_RAM_OUT);
-	valControlInstructionOut = digitalRead(PIN_CONTROL_INSTRUCTION_OUT);
-	valControlInstructionIn = digitalRead(PIN_CONTROL_INSTRUCTION_IN);
-	valControlARegisterIn = digitalRead(PIN_CONTROL_A_REGISTER_IN);
-	valControlARegisterOut = digitalRead(PIN_CONTROL_A_REGISTER_OUT);
-	valControlSumOut = digitalRead(PIN_CONTROL_SUM_OUT);
-	valControlSubtract = digitalRead(PIN_CONTROL_SUBTRACT);
-	valControlBRegisterIn = digitalRead(PIN_CONTROL_B_INSTRUCTION_IN);
-	valControlOutputIn = digitalRead(PIN_CONTROL_OUTPUT_IN);
-	valControlCounterEnable = digitalRead(PIN_CONTROL_COUNTER_ENABLE);
-	valControlCounterOut = digitalRead(PIN_CONTROL_COUNTER_OUT);
-	valControlJump = digitalRead(PIN_CONTROL_JUMP);
-	valControlFlags = digitalRead(PIN_CONTROL_FLAGS);
+void onClock() {
 
-	valLEDout128 = digitalRead(PIN_LED_OUT_128);
-	valLEDout64 = digitalRead(PIN_LED_OUT_64);
-	valLEDout32 = digitalRead(PIN_LED_OUT_32);
-	valLEDout16 = digitalRead(PIN_LED_OUT_16);
-	valLEDout8 = digitalRead(PIN_LED_OUT_8);
-	valLEDout4 = digitalRead(PIN_LED_OUT_4);
-	valLEDout2 = digitalRead(PIN_LED_OUT_2);
-	valLEDout1 = digitalRead(PIN_LED_OUT_1);
-
-	//check if there have been changes since the last poll
-	if (
-			valBus1_prev != valBus1 ||
-			valBus2_prev != valBus2 ||
-			valBus3_prev != valBus3 ||
-			valBus4_prev != valBus4 ||
-			valBus5_prev != valBus5 ||
-			valBus6_prev != valBus6 ||
-			valBus7_prev != valBus7 ||
-			valBus8_prev != valBus8 ||
-			valControlHalt_prev != valControlHalt ||
-			valControlMemoryAddressIn_prev != valControlMemoryAddressIn ||
-			valControlRamIn_prev != valControlRamIn ||
-			valControlRamOut_prev != valControlRamOut ||
-			valControlInstructionOut_prev != valControlInstructionOut ||
-			valControlInstructionIn_prev != valControlInstructionIn ||
-			valControlARegisterIn_prev != valControlARegisterIn ||
-			valControlARegisterOut_prev != valControlARegisterOut ||
-			valControlSumOut_prev != valControlSumOut ||
-			valControlSubtract_prev != valControlSubtract ||
-			valControlBRegisterIn_prev != valControlBRegisterIn ||
-			valControlOutputIn_prev != valControlOutputIn ||
-			valControlCounterEnable_prev != valControlCounterEnable ||
-			valControlCounterOut_prev != valControlCounterOut ||
-			valControlJump_prev != valControlJump ||
-			valControlFlags_prev != valControlFlags ||
-			valLEDout128_prev != valLEDout128 ||
-			valLEDout64_prev != valLEDout64 ||
-			valLEDout32_prev != valLEDout32 ||
-			valLEDout16_prev != valLEDout16 ||
-			valLEDout8_prev != valLEDout8 ||
-			valLEDout4_prev != valLEDout4 ||
-			valLEDout2_prev != valLEDout2 ||
-			valLEDout1_prev != valLEDout1
-		)
+	if (bMonitor)
 	{
-		//changes detected, send values to Serial
-		Serial.print("Bus:");
-		Serial.print(valBus1);
-		Serial.print(valBus2);
-		Serial.print(valBus3);
-		Serial.print(valBus4);
-		Serial.print(valBus5);
-		Serial.print(valBus6);
-		Serial.print(valBus7);
-		Serial.print(valBus8);
+		valBus1 = digitalRead(PIN_BUS1);
+		valBus2 = digitalRead(PIN_BUS2);
+		valBus3 = digitalRead(PIN_BUS3);
+		valBus4 = digitalRead(PIN_BUS4);
+		valBus5 = digitalRead(PIN_BUS5);
+		valBus6 = digitalRead(PIN_BUS6);
+		valBus7 = digitalRead(PIN_BUS7);
+		valBus8 = digitalRead(PIN_BUS8);
 
-		Serial.print("  Control:");
-		Serial.print(valControlHalt);
-		Serial.print(valControlMemoryAddressIn);
-		Serial.print(valControlRamIn);
-		Serial.print(valControlRamOut);
-		Serial.print(valControlInstructionIn);
-		Serial.print(valControlInstructionOut);
-		Serial.print(valControlARegisterIn);
-		Serial.print(valControlARegisterOut);
-		Serial.print(valControlSumOut);
-		Serial.print(valControlSubtract);
-		Serial.print(valControlBRegisterIn);
-		Serial.print(valControlOutputIn);
-		Serial.print(valControlCounterEnable);
-		Serial.print(valControlCounterOut);
-		Serial.print(valControlJump);
-		Serial.print(valControlFlags);
+		valControlHalt = digitalRead(PIN_CONTROL_HALT);
+		valControlMemoryAddressIn = digitalRead(PIN_CONTROL_MEMORY_ADDRESS_IN);
+		valControlRamIn = digitalRead(PIN_CONTROL_RAM_IN);
+		valControlRamOut = digitalRead(PIN_CONTROL_RAM_OUT);
+		valControlInstructionOut = digitalRead(PIN_CONTROL_INSTRUCTION_OUT);
+		valControlInstructionIn = digitalRead(PIN_CONTROL_INSTRUCTION_IN);
+		valControlARegisterIn = digitalRead(PIN_CONTROL_A_REGISTER_IN);
+		valControlARegisterOut = digitalRead(PIN_CONTROL_A_REGISTER_OUT);
+		valControlSumOut = digitalRead(PIN_CONTROL_SUM_OUT);
+		valControlSubtract = digitalRead(PIN_CONTROL_SUBTRACT);
+		valControlBRegisterIn = digitalRead(PIN_CONTROL_B_INSTRUCTION_IN);
+		valControlOutputIn = digitalRead(PIN_CONTROL_OUTPUT_IN);
+		valControlCounterEnable = digitalRead(PIN_CONTROL_COUNTER_ENABLE);
+		valControlCounterOut = digitalRead(PIN_CONTROL_COUNTER_OUT);
+		valControlJump = digitalRead(PIN_CONTROL_JUMP);
+		valControlFlags = digitalRead(PIN_CONTROL_FLAGS);
+
+		valLEDout128 = digitalRead(PIN_LED_OUT_128);
+		valLEDout64 = digitalRead(PIN_LED_OUT_64);
+		valLEDout32 = digitalRead(PIN_LED_OUT_32);
+		valLEDout16 = digitalRead(PIN_LED_OUT_16);
+		valLEDout8 = digitalRead(PIN_LED_OUT_8);
+		valLEDout4 = digitalRead(PIN_LED_OUT_4);
+		valLEDout2 = digitalRead(PIN_LED_OUT_2);
+		valLEDout1 = digitalRead(PIN_LED_OUT_1);
 
 		getBinaryOutput();
-		Serial.print("  Out:");
-		Serial.print(outputString);
-		Serial.print(" [");
-		Serial.print(getDecimalOutput());
-		Serial.print("]");
+		String outString;
+		for (int i = 0; i < 8; i++) {
+			outString += outputString[i];
+		}
 
-		Serial.println();
+		
+		char buffer[100];
+		sprintf(buffer, "Bus:%d%d%d%d%d%d%d%d  Control:%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d  Out:%s [%d]  Clock:%d", valBus1, valBus2, valBus3, valBus4, valBus5, valBus6, valBus7, valBus8
+			, valControlHalt, valControlMemoryAddressIn, valControlRamIn, valControlRamOut
+			, valControlInstructionIn, valControlInstructionOut, valControlARegisterIn, valControlARegisterOut, valControlSumOut, valControlSubtract, valControlBRegisterIn
+			, valControlOutputIn, valControlCounterEnable, valControlCounterOut, valControlJump, valControlFlags
+			, outString.c_str()
+			, getDecimalOutput()
+			, (int)currentClockSpeed
+		);
 
-		valBus1_prev = valBus1;
-		valBus2_prev = valBus2;
-		valBus3_prev = valBus3;
-		valBus4_prev = valBus4;
-		valBus5_prev = valBus5;
-		valBus6_prev = valBus6;
-		valBus7_prev = valBus7;
-		valBus8_prev = valBus8;
+		Serial.println(buffer);
 
-		valControlHalt_prev = valControlHalt;
-		valControlMemoryAddressIn_prev = valControlMemoryAddressIn;
-		valControlRamIn_prev = valControlRamIn;
-		valControlRamOut_prev = valControlRamOut;
-		valControlInstructionOut_prev = valControlInstructionOut;
-		valControlInstructionIn_prev = valControlInstructionIn;
-		valControlARegisterIn_prev = valControlARegisterIn;
-		valControlARegisterOut_prev = valControlARegisterOut;
-		valControlSumOut_prev = valControlSumOut;
-		valControlSubtract_prev = valControlSubtract;
-		valControlBRegisterIn_prev = valControlBRegisterIn;
-		valControlOutputIn_prev = valControlOutputIn;
-		valControlCounterEnable_prev = valControlCounterEnable;
-		valControlCounterOut_prev = valControlCounterOut;
-		valControlJump_prev = valControlJump;
-		valControlFlags_prev = valControlFlags;
-
-		valLEDout128_prev = valLEDout128;
-		valLEDout64_prev = valLEDout64;
-		valLEDout32_prev = valLEDout32;
-		valLEDout16_prev = valLEDout16;
-		valLEDout8_prev = valLEDout8;
-		valLEDout4_prev = valLEDout4;
-		valLEDout2_prev = valLEDout2;
-		valLEDout1_prev = valLEDout1;
 	}
+
 }
+
+
 
 void setRAMCustom()
 {
@@ -594,6 +551,10 @@ void setSingleRAM(String RAMaddress, String RAMcontents) {
 
 void getBinaryOutput()
 {
+	/*for (int i = 0; i < 8; i++) {
+		outputString[i] = '0';
+	}*/
+
 	if (valLEDout128) { outputString[0] = '1'; }
 	else { outputString[0] = '0'; }
 	if (valLEDout64) { outputString[1] = '1'; }
