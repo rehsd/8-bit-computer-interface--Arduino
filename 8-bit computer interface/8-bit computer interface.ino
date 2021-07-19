@@ -23,6 +23,8 @@
  To use the monitor:
  -Set clock mode switch to automatic
  -Set memory program mode switch to dsiable
+
+ If using an additional Arduino Nano to capture the board clock, code for that Nano is at that bottom of this page.
 */
 
 #include<Wire.h>
@@ -590,3 +592,64 @@ int getDecimalOutput()
 	if (valLEDout1) { decimalOut += 1; }
 	return decimalOut;
 }
+
+
+
+
+
+/*
+ //Sample code for separate Nano to capture clock and send to Mega
+
+
+ 
+ //Name:		Clock_Speed.ino
+ //Created:	7/19/2021 3:53:25 AM
+ //Author:	rehsd
+ //
+ //Connect SCL and SDA between Mega and Nano.
+
+#include<Wire.h>
+
+unsigned int pulses = 0;
+unsigned long lastMicros = 0;
+volatile float currentClockSpeed = 0.0;
+
+
+// the setup function runs once when you press reset or power the board
+void setup() {
+	pinMode(2, INPUT);	//clock
+	attachInterrupt(digitalPinToInterrupt(2), onClock, RISING);
+	Wire.begin();
+}
+
+// the loop function runs over and over again until power down or reset
+void loop() {
+	//Serial.println((int)currentClockSpeed);
+	int cClock = (int)currentClockSpeed;
+	Serial.print(cClock);
+	Serial.print(".");
+	byte myArray[2];
+	myArray[0] = (cClock >> 8) & 0xFF;
+	myArray[1] = cClock & 0xFF;
+
+	Wire.beginTransmission(9);
+	Wire.write(myArray, 2);
+	Wire.endTransmission();
+	delay(1000);
+}
+
+void onClock() {
+	//Serial.println("clock...");
+	pulses++;
+	unsigned long currentMicros = micros();
+	float timeLapsed = (currentMicros - lastMicros) / 1000000.0;
+	//Serial.println(timeLapsed);
+	if (timeLapsed > .1)
+	{
+		currentClockSpeed = pulses / timeLapsed;
+		//Serial.println(currentClockSpeed);
+		pulses = 0;
+		lastMicros = currentMicros;
+	}
+}
+*/
