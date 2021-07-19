@@ -160,6 +160,28 @@ String setRAMCustomNewVals = "";
 bool bMonitor = false;
 volatile long int currentClockSpeed = 0;
 
+void receiveEvent(int bytes)
+{
+	//Serial.print('\n' + bytes + '\n');
+	//Serial.print(":");
+	//Used to receive clock data on SCL/SDA
+
+	//Serial.print("\tevent\t");
+	byte a[2];
+	int sumBoth;
+	Wire.readBytes(a, 2);
+	//b = Wire.read();
+
+	sumBoth = a[0];
+	sumBoth = (sumBoth << 8) | a[1];
+
+	//Serial.print(sumBoth);
+
+	currentClockSpeed = sumBoth;
+	//Serial.println(currentClockSpeed);
+
+}
+
 void setup() {
 	//Serial.println("\n\nLoading...\n");
 	
@@ -224,25 +246,7 @@ void setup() {
 	Wire.onReceive(receiveEvent);
 }
 
-void receiveEvent(int bytes)
-{
-	//Used to receive clock data on SCL/SDA
 
-	//Serial.print("\tevent\t");
-	byte a[2];
-	int sumBoth;
-	Wire.readBytes(a, 2);
-	//b = Wire.read();
-
-	sumBoth = a[0];
-	sumBoth = (sumBoth << 8) | a[1];
-
-	//Serial.print(sumBoth);
-
-	currentClockSpeed = sumBoth;
-	//Serial.print(currentClockSpeed);
-
-}
 
 
 void loop() {
@@ -340,7 +344,7 @@ void onClock() {
 			outString += outputString[i];
 		}
 
-		
+
 		char buffer[100];
 		sprintf(buffer, "Bus:%d%d%d%d%d%d%d%d  Control:%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d  Out:%s [%d]  Clock:%d", valBus1, valBus2, valBus3, valBus4, valBus5, valBus6, valBus7, valBus8
 			, valControlHalt, valControlMemoryAddressIn, valControlRamIn, valControlRamOut
