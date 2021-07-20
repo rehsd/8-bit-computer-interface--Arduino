@@ -79,12 +79,23 @@
 #define PIN_RAM_ADDR_1	53
 
 #define PIN_CLOCK		2					//Pin for clock from 555 IC
+#define PIN_LOAD_DEFAULTS	3				//Pin for button interrupts to load default program
 
-const String COMMAND_LDA = "0001";
-const String COMMAND_ADD = "0010";
-const String COMMAND_OUT = "1110";
-const String COMMAND_HLT = "1111";
-//TODO fill in the rest of these constants...
+const String COMMAND_LDA	= "0001";
+const String COMMAND_ADD	= "0010";
+const String COMMAND_SUB	= "0011";
+const String COMMAND_STA	= "0100";
+const String COMMAND_LDI	= "0101";
+const String COMMAND_JMP	= "0110";
+const String COMMAND_JC		= "0111";
+const String COMMAND_JZ		= "1000";
+const String COMMAND_NOOP1	= "1001";
+const String COMMAND_NOOP2	= "1010";
+const String COMMAND_NOOP3	= "1011";
+const String COMMAND_NOOP4	= "1100";
+const String COMMAND_NOOP5	= "1101";
+const String COMMAND_OUT	= "1110";
+const String COMMAND_HLT	= "1111";
 
 int valBus1 = 0;
 int valBus2 = 0;
@@ -184,6 +195,18 @@ void receiveEvent(int bytes)
 
 }
 
+void buttonLoadDefaults_ISR()
+{
+	static unsigned long last_interrupt_time = 0;
+	unsigned long interrupt_time = millis();
+	// If interrupts come faster than 200ms, assume it's a bounce and ignore
+	if (interrupt_time - last_interrupt_time > 1000)
+	{
+		setRAM();
+	}
+	last_interrupt_time = interrupt_time;
+	
+}
 void setup() {
 	//Serial.println("\n\nLoading...\n");
 	
@@ -237,10 +260,10 @@ void setup() {
 	pinMode(PIN_SET_RAM, OUTPUT);			//to physical set RAM button on board
 
 	pinMode(PIN_CLOCK, INPUT);
-	//pinMode(PIN_CLOCK2, INPUT);
+	pinMode(PIN_LOAD_DEFAULTS, INPUT_PULLUP);
 
 	attachInterrupt(digitalPinToInterrupt(PIN_CLOCK), onClock, RISING);
-	//attachInterrupt(digitalPinToInterrupt(PIN_CLOCK2), onClock2, RISING);
+	attachInterrupt(digitalPinToInterrupt(PIN_LOAD_DEFAULTS), buttonLoadDefaults_ISR, CHANGE);
 
 	Serial.begin(115200);
 
@@ -408,22 +431,23 @@ void setRAMCustom()
 void setRAM() {
 	//set values as you see appropriate
 	//use to easily load a common set of values for testing
-	setSingleRAM("0000", COMMAND_LDA + "1110");
+	//currently using Ben's example of counting up to 255 and back down, from the Conditional jump  instructions video
+	setSingleRAM("0000", COMMAND_OUT + "0000");
 	setSingleRAM("0001", COMMAND_ADD + "1111");
-	setSingleRAM("0010", COMMAND_OUT + "0000");
-	setSingleRAM("0011", COMMAND_ADD + "1111");
-	setSingleRAM("0100", COMMAND_OUT + "0000");
-	setSingleRAM("0101", COMMAND_ADD + "1111");
-	setSingleRAM("0110", COMMAND_OUT + "0000");
-	setSingleRAM("0111", COMMAND_ADD + "1111");
-	setSingleRAM("1000", COMMAND_OUT + "0000");
-	setSingleRAM("1001", COMMAND_ADD + "1111");
-	setSingleRAM("1010", COMMAND_OUT + "0000");
-	setSingleRAM("1011", COMMAND_ADD + "1111");
-	setSingleRAM("1100", COMMAND_OUT + "0000");
-	setSingleRAM("1101", COMMAND_OUT + "0000");
-	setSingleRAM("1110", "00000000");
-	setSingleRAM("1111", "00000001");				
+	setSingleRAM("0010", COMMAND_JC + "0100");
+	setSingleRAM("0011", COMMAND_JMP + "0000");
+	setSingleRAM("0100", COMMAND_SUB + "1111");
+	setSingleRAM("0101", COMMAND_OUT + "0000");
+	setSingleRAM("0110", COMMAND_JZ + "0000");
+	setSingleRAM("0111", COMMAND_JMP + "0100");
+	setSingleRAM("1000", COMMAND_NOOP1 + "0000");
+	setSingleRAM("1001", COMMAND_NOOP1 + "0000");
+	setSingleRAM("1010", COMMAND_NOOP1 + "0000");
+	setSingleRAM("1011", COMMAND_NOOP1 + "0000");
+	setSingleRAM("1100", COMMAND_NOOP1 + "0000");
+	setSingleRAM("1101", COMMAND_NOOP1 + "0000");
+	setSingleRAM("1110", COMMAND_NOOP1 + "0000");
+	setSingleRAM("1111", "00000001");		//NoOp decimal 1			
 }
 
 void setSingleRAM(String RAMaddress, String RAMcontents) {
