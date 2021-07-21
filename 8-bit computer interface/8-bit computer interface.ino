@@ -29,6 +29,9 @@
 
 #include<Wire.h>
 
+//const int CONNECTION_RATE = 460800;		//Serial connection speed. Match this to the same const in the Windows application.
+
+
 #define PIN_BUS1 23							//PIN1 (far left) of Bus
 #define PIN_BUS2 25
 #define PIN_BUS3 27
@@ -97,101 +100,31 @@ const String COMMAND_NOOP5	= "1101";
 const String COMMAND_OUT	= "1110";
 const String COMMAND_HLT	= "1111";
 
-int valBus1 = 0;
-int valBus2 = 0;
-int valBus3 = 0;
-int valBus4 = 0;
-int valBus5 = 0;
-int valBus6 = 0;
-int valBus7 = 0;
-int valBus8 = 0;
-
-int valControlHalt = 0;
-int valControlMemoryAddressIn = 0;
-int valControlRamIn = 0;
-int valControlRamOut = 0;
-int valControlInstructionOut = 0;
-int valControlInstructionIn = 0;
-int valControlARegisterIn = 0;
-int valControlARegisterOut = 0;
-int valControlSumOut = 0;
-int valControlSubtract = 0;
-int valControlBRegisterIn = 0;
-int valControlOutputIn = 0;
-int valControlCounterEnable = 0;
-int valControlCounterOut = 0;
-int valControlJump = 0;
-int valControlFlags = 0;
-
-int valLEDout128 = 0;
-int valLEDout64 = 0;
-int valLEDout32 = 0;
-int valLEDout16 = 0;
-int valLEDout8 = 0;
-int valLEDout4 = 0;
-int valLEDout2 = 0;
-int valLEDout1 = 0;
-volatile char outputString[8]{'0','0','0','0','0','0','0','0'};
-
-int valBus1_prev = 0;
-int valBus2_prev = 0;
-int valBus3_prev = 0;
-int valBus4_prev = 0;
-int valBus5_prev = 0;
-int valBus6_prev = 0;
-int valBus7_prev = 0;
-int valBus8_prev = 0;
-
-int valControlHalt_prev = 0;
-int valControlMemoryAddressIn_prev = 0;
-int valControlRamIn_prev = 0;
-int valControlRamOut_prev = 0;
-int valControlInstructionOut_prev = 0;
-int valControlInstructionIn_prev = 0;
-int valControlARegisterIn_prev = 0;
-int valControlARegisterOut_prev = 0;
-int valControlSumOut_prev = 0;
-int valControlSubtract_prev = 0;
-int valControlBRegisterIn_prev = 0;
-int valControlOutputIn_prev = 0;
-int valControlCounterEnable_prev = 0;
-int valControlCounterOut_prev = 0;
-int valControlJump_prev = 0;
-int valControlFlags_prev = 0;
-
-int valLEDout128_prev = 0;
-int valLEDout64_prev = 0;
-int valLEDout32_prev = 0;
-int valLEDout16_prev = 0;
-int valLEDout8_prev = 0;
-int valLEDout4_prev = 0;
-int valLEDout2_prev = 0;
-int valLEDout1_prev = 0;
+volatile char outputString[8]{ '0','0','0','0','0','0','0','0' };
 
 String setRAMCustomNewVals = "";
 
-bool bMonitor = false;
-volatile long int currentClockSpeed = 0;
+volatile bool bMonitor = false;
+volatile unsigned short currentClockSpeed = 0;
 
 void receiveEvent(int bytes)
 {
-	//Serial.print('\n' + bytes + '\n');
-	//Serial.print(":");
 	//Used to receive clock data on SCL/SDA
 
-	//Serial.print("\tevent\t");
-	byte a[2];
-	int sumBoth;
-	Wire.readBytes(a, 2);
-	//b = Wire.read();
+		byte a[2];
+		int sumBoth;
+		
+		while (Wire.available()) { Wire.readBytes(a, 2); }
 
-	sumBoth = a[0];
-	sumBoth = (sumBoth << 8) | a[1];
+		sumBoth = a[0];
+		sumBoth = (sumBoth << 8) | a[1];
+		currentClockSpeed = sumBoth;
 
-	//Serial.print(sumBoth);
-
-	currentClockSpeed = sumBoth;
-	//Serial.println(currentClockSpeed);
+		//Check if clock speed is coming from Nano OK
+		//If too high, Mega doesn't seem to be able to keep up (@~130Hz for clock). Likely need to optimize code on Mega.
+		//Increasing serial connection speed helps
+		//Serial.println("**********");
+		//Serial.println(currentClockSpeed);
 
 }
 
@@ -207,6 +140,7 @@ void buttonLoadDefaults_ISR()
 	last_interrupt_time = interrupt_time;
 	
 }
+
 void setup() {
 	//Serial.println("\n\nLoading...\n");
 	
@@ -265,8 +199,13 @@ void setup() {
 	attachInterrupt(digitalPinToInterrupt(PIN_CLOCK), onClock, RISING);
 	attachInterrupt(digitalPinToInterrupt(PIN_LOAD_DEFAULTS), buttonLoadDefaults_ISR, CHANGE);
 
-	Serial.begin(115200);
+	Serial.begin(921600);
+	//Serial.begin(460800);
+	//Serial.begin(CONNECTION_RATE);	//Using a const fails to work with vMicro serial debug  ?!
 
+	Wire.setWireTimeout(50000, false);
+	Wire.setTimeout(50000);
+	Wire.setClock(10000);
 	Wire.begin(9);
 	Wire.onReceive(receiveEvent);
 }
@@ -325,63 +264,65 @@ void loop() {
 
 
 void onClock() {
-
+	//Keep this code as short/efficient as possible
 	if (bMonitor)
 	{
-		valBus1 = digitalRead(PIN_BUS1);
-		valBus2 = digitalRead(PIN_BUS2);
-		valBus3 = digitalRead(PIN_BUS3);
-		valBus4 = digitalRead(PIN_BUS4);
-		valBus5 = digitalRead(PIN_BUS5);
-		valBus6 = digitalRead(PIN_BUS6);
-		valBus7 = digitalRead(PIN_BUS7);
-		valBus8 = digitalRead(PIN_BUS8);
+		short valBus1 = digitalRead(PIN_BUS1);
+		short valBus2 = digitalRead(PIN_BUS2);
+		short valBus3 = digitalRead(PIN_BUS3);
+		short valBus4 = digitalRead(PIN_BUS4);
+		short valBus5 = digitalRead(PIN_BUS5);
+		short valBus6 = digitalRead(PIN_BUS6);
+		short valBus7 = digitalRead(PIN_BUS7);
+		short valBus8 = digitalRead(PIN_BUS8);
 
-		valControlHalt = digitalRead(PIN_CONTROL_HALT);
-		valControlMemoryAddressIn = digitalRead(PIN_CONTROL_MEMORY_ADDRESS_IN);
-		valControlRamIn = digitalRead(PIN_CONTROL_RAM_IN);
-		valControlRamOut = digitalRead(PIN_CONTROL_RAM_OUT);
-		valControlInstructionOut = digitalRead(PIN_CONTROL_INSTRUCTION_OUT);
-		valControlInstructionIn = digitalRead(PIN_CONTROL_INSTRUCTION_IN);
-		valControlARegisterIn = digitalRead(PIN_CONTROL_A_REGISTER_IN);
-		valControlARegisterOut = digitalRead(PIN_CONTROL_A_REGISTER_OUT);
-		valControlSumOut = digitalRead(PIN_CONTROL_SUM_OUT);
-		valControlSubtract = digitalRead(PIN_CONTROL_SUBTRACT);
-		valControlBRegisterIn = digitalRead(PIN_CONTROL_B_INSTRUCTION_IN);
-		valControlOutputIn = digitalRead(PIN_CONTROL_OUTPUT_IN);
-		valControlCounterEnable = digitalRead(PIN_CONTROL_COUNTER_ENABLE);
-		valControlCounterOut = digitalRead(PIN_CONTROL_COUNTER_OUT);
-		valControlJump = digitalRead(PIN_CONTROL_JUMP);
-		valControlFlags = digitalRead(PIN_CONTROL_FLAGS);
+		short valControlHalt = digitalRead(PIN_CONTROL_HALT);
+		short valControlMemoryAddressIn = digitalRead(PIN_CONTROL_MEMORY_ADDRESS_IN);
+		short valControlRamIn = digitalRead(PIN_CONTROL_RAM_IN);
+		short valControlRamOut = digitalRead(PIN_CONTROL_RAM_OUT);
+		short valControlInstructionOut = digitalRead(PIN_CONTROL_INSTRUCTION_OUT);
+		short valControlInstructionIn = digitalRead(PIN_CONTROL_INSTRUCTION_IN);
+		short valControlARegisterIn = digitalRead(PIN_CONTROL_A_REGISTER_IN);
+		short valControlARegisterOut = digitalRead(PIN_CONTROL_A_REGISTER_OUT);
+		short valControlSumOut = digitalRead(PIN_CONTROL_SUM_OUT);
+		short valControlSubtract = digitalRead(PIN_CONTROL_SUBTRACT);
+		short valControlBRegisterIn = digitalRead(PIN_CONTROL_B_INSTRUCTION_IN);
+		short valControlOutputIn = digitalRead(PIN_CONTROL_OUTPUT_IN);
+		short valControlCounterEnable = digitalRead(PIN_CONTROL_COUNTER_ENABLE);
+		short valControlCounterOut = digitalRead(PIN_CONTROL_COUNTER_OUT);
+		short valControlJump = digitalRead(PIN_CONTROL_JUMP);
+		short valControlFlags = digitalRead(PIN_CONTROL_FLAGS);
 
-		valLEDout128 = digitalRead(PIN_LED_OUT_128);
-		valLEDout64 = digitalRead(PIN_LED_OUT_64);
-		valLEDout32 = digitalRead(PIN_LED_OUT_32);
-		valLEDout16 = digitalRead(PIN_LED_OUT_16);
-		valLEDout8 = digitalRead(PIN_LED_OUT_8);
-		valLEDout4 = digitalRead(PIN_LED_OUT_4);
-		valLEDout2 = digitalRead(PIN_LED_OUT_2);
-		valLEDout1 = digitalRead(PIN_LED_OUT_1);
+		short valLEDout128 = digitalRead(PIN_LED_OUT_128);
+		short valLEDout64 = digitalRead(PIN_LED_OUT_64);
+		short valLEDout32 = digitalRead(PIN_LED_OUT_32);
+		short valLEDout16 = digitalRead(PIN_LED_OUT_16);
+		short valLEDout8 = digitalRead(PIN_LED_OUT_8);
+		short valLEDout4 = digitalRead(PIN_LED_OUT_4);
+		short valLEDout2 = digitalRead(PIN_LED_OUT_2);
+		short valLEDout1 = digitalRead(PIN_LED_OUT_1);
 
-		getBinaryOutput();
+		getBinaryOutput(valLEDout128, valLEDout64, valLEDout32, valLEDout16, valLEDout8, valLEDout4, valLEDout2, valLEDout1);
 		String outString;
 		for (int i = 0; i < 8; i++) {
 			outString += outputString[i];
 		}
 
-
-		char buffer[100];
+		char buffer[70];
 		sprintf(buffer, "Bus:%d%d%d%d%d%d%d%d  Control:%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d  Out:%s [%d]  Clock:%d", valBus1, valBus2, valBus3, valBus4, valBus5, valBus6, valBus7, valBus8
 			, valControlHalt, valControlMemoryAddressIn, valControlRamIn, valControlRamOut
 			, valControlInstructionIn, valControlInstructionOut, valControlARegisterIn, valControlARegisterOut, valControlSumOut, valControlSubtract, valControlBRegisterIn
 			, valControlOutputIn, valControlCounterEnable, valControlCounterOut, valControlJump, valControlFlags
 			, outString.c_str()
-			, getDecimalOutput()
+			, getDecimalOutput(valLEDout128, valLEDout64, valLEDout32, valLEDout16, valLEDout8, valLEDout4, valLEDout2, valLEDout1)
 			, (int)currentClockSpeed
 		);
 
-		Serial.println(buffer);
+		
 
+		//The more information written to Serial here, the lower the ceiling for measuring the clock.
+		//The code above doesn't seem to impact the ceiling much, if at all.
+		Serial.println(buffer);
 	}
 
 }
@@ -579,7 +520,7 @@ void setSingleRAM(String RAMaddress, String RAMcontents) {
 	Serial.println("   ...complete!");
 }
 
-void getBinaryOutput()
+void getBinaryOutput(short valLEDout128, short valLEDout64, short valLEDout32, short valLEDout16, short valLEDout8, short valLEDout4, short valLEDout2, short valLEDout1)
 {
 	/*for (int i = 0; i < 8; i++) {
 		outputString[i] = '0';
@@ -603,7 +544,7 @@ void getBinaryOutput()
 	else { outputString[7] = '0'; }
 }
 
-int getDecimalOutput()
+int getDecimalOutput(short valLEDout128, short valLEDout64, short valLEDout32, short valLEDout16, short valLEDout8, short valLEDout4, short valLEDout2, short valLEDout1)
 {
 	int decimalOut = 0;
 	if (valLEDout128) { decimalOut += 128; }
