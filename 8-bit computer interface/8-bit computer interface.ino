@@ -199,8 +199,7 @@ void setup() {
 	attachInterrupt(digitalPinToInterrupt(PIN_CLOCK), onClock, RISING);
 	attachInterrupt(digitalPinToInterrupt(PIN_LOAD_DEFAULTS), buttonLoadDefaults_ISR, CHANGE);
 
-	Serial.begin(921600);
-	//Serial.begin(460800);
+	Serial.begin(115200);
 	//Serial.begin(CONNECTION_RATE);	//Using a const fails to work with vMicro serial debug  ?!
 
 	Wire.setWireTimeout(50000, false);
@@ -331,6 +330,7 @@ void onClock() {
 
 void setRAMCustom()
 {
+	noInterrupts();
 	//16 bytes of data to be received as a single string
 	//grab portion of string for each address
 	String s0000 = setRAMCustomNewVals.substring(0, 8);
@@ -367,6 +367,8 @@ void setRAMCustom()
 	setSingleRAM("1101", s1101);
 	setSingleRAM("1110", s1110);
 	setSingleRAM("1111", s1111);
+
+	interrupts();
 }
 
 void setRAM() {
