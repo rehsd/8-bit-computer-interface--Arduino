@@ -1,8 +1,8 @@
 /*
  Name:				8-bit-computer-interface.ino
- Created:			19 July 2021
+ Created:			22 July 2021
  Author:			rehsd
- Version:			0.02
+ Version:			0.03
  Target Arduino:	Mega 2560
  
  *** Much of this code can be improved for better efficiency, adherence to coding standards,
@@ -106,6 +106,7 @@ String setRAMCustomNewVals = "";
 
 volatile bool bMonitor = false;
 volatile unsigned short currentClockSpeed = 0;
+bool bHex = false;
 
 void receiveEvent(int bytes)
 {
@@ -209,12 +210,9 @@ void setup() {
 	Wire.onReceive(receiveEvent);
 }
 
-
-
-
 void loop() {
 	String mySelection;
-	Serial.write("Choose Action:\n(P) Program Defaults\n(C) Program Custom Values\n(M) Monitor Bus, Control, & Output\n>\n");
+	Serial.write("Choose Action:\n(P) Program Defaults\n(C) Program Custom Values\n(M) Monitor Bus, Control, & Output\n(H) Monitor Bus, Control & Output (Hex)\n>\n");
 	while (Serial.available() == 0) {
 		//sit and wait 
 	}
@@ -243,11 +241,21 @@ void loop() {
 	else if (mySelection == "M" || mySelection == "m")
 	{
 		Serial.println("Starting monitor...\n (Press 'x' and 'Enter' to exit monitor)\n");
-		//bMonitor = true;
-
+		bHex = false;
+		bMonitor = true;
 		while (Serial.available() == 0)
 		{
-			bMonitor = true;
+			//sit and wait
+		}
+	}
+	else if (mySelection == "H" || mySelection == "h")
+	{
+		Serial.println("Starting monitor (hexadecimal)...\n (Press 'x' and 'Enter' to exit monitor)\n");
+		bHex = true;
+		bMonitor = true;
+		while (Serial.available() == 0)
+		{
+			//sit and wait
 		}
 	}
 	else if (mySelection == "X" || mySelection == "x")
@@ -260,7 +268,6 @@ void loop() {
 		Serial.println("Invalid choice");
 	}
 }
-
 
 void onClock() {
 	//Keep this code as short/efficient as possible
@@ -301,32 +308,140 @@ void onClock() {
 		short valLEDout2 = digitalRead(PIN_LED_OUT_2);
 		short valLEDout1 = digitalRead(PIN_LED_OUT_1);
 
-		getBinaryOutput(valLEDout128, valLEDout64, valLEDout32, valLEDout16, valLEDout8, valLEDout4, valLEDout2, valLEDout1);
-		String outString;
-		for (int i = 0; i < 8; i++) {
-			outString += outputString[i];
+		if (!bHex)
+		{
+			getBinaryOutput(valLEDout128, valLEDout64, valLEDout32, valLEDout16, valLEDout8, valLEDout4, valLEDout2, valLEDout1);
+			String outString;
+			for (int i = 0; i < 8; i++) {
+				outString += outputString[i];
+			}
+
+			char buffer[70];
+			sprintf(buffer, "Bus:%d%d%d%d%d%d%d%d  Control:%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d  Out:%s [%d]  Clock:%d", valBus1, valBus2, valBus3, valBus4, valBus5, valBus6, valBus7, valBus8
+				, valControlHalt, valControlMemoryAddressIn, valControlRamIn, valControlRamOut
+				, valControlInstructionIn, valControlInstructionOut, valControlARegisterIn, valControlARegisterOut, valControlSumOut, valControlSubtract, valControlBRegisterIn
+				, valControlOutputIn, valControlCounterEnable, valControlCounterOut, valControlJump, valControlFlags
+				, outString.c_str()
+				, getDecimalOutput(valLEDout128, valLEDout64, valLEDout32, valLEDout16, valLEDout8, valLEDout4, valLEDout2, valLEDout1)
+				, (int)currentClockSpeed
+			);
+			Serial.println(buffer);
 		}
+		else
+		{
+			//Use shorter hex format to reduce Serial I/O and support higher clock speeds
+			//The more information written to Serial here, the lower the ceiling for measuring the clock.
 
-		char buffer[70];
-		sprintf(buffer, "Bus:%d%d%d%d%d%d%d%d  Control:%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d  Out:%s [%d]  Clock:%d", valBus1, valBus2, valBus3, valBus4, valBus5, valBus6, valBus7, valBus8
-			, valControlHalt, valControlMemoryAddressIn, valControlRamIn, valControlRamOut
-			, valControlInstructionIn, valControlInstructionOut, valControlARegisterIn, valControlARegisterOut, valControlSumOut, valControlSubtract, valControlBRegisterIn
-			, valControlOutputIn, valControlCounterEnable, valControlCounterOut, valControlJump, valControlFlags
-			, outString.c_str()
-			, getDecimalOutput(valLEDout128, valLEDout64, valLEDout32, valLEDout16, valLEDout8, valLEDout4, valLEDout2, valLEDout1)
-			, (int)currentClockSpeed
-		);
-
-		
-
-		//The more information written to Serial here, the lower the ceiling for measuring the clock.
-		//The code above doesn't seem to impact the ceiling much, if at all.
-		Serial.println(buffer);
+			String sBus, sControl, sOut, sClock;
+			sBus = GetHexFromByte((String)valBus1 + (String)valBus2 + (String)valBus3 + (String)valBus4 + (String)valBus5 + (String)valBus6 + (String)valBus7 + (String)valBus8);
+			sControl = GetHexFromByte((String)valControlHalt + (String)valControlMemoryAddressIn + (String)valControlRamIn + (String)valControlRamOut
+				 + (String)valControlInstructionIn + (String)valControlInstructionOut + (String)valControlARegisterIn + (String)valControlARegisterOut + (String)valControlSumOut + (String)valControlSubtract + (String)valControlBRegisterIn
+				 + (String)valControlOutputIn + (String)valControlCounterEnable + (String)valControlCounterOut + (String)valControlJump + (String)valControlFlags);
+			sOut = GetHexFromByte((String)valLEDout128 + (String)valLEDout64 + (String)valLEDout32 + (String)valLEDout16 + (String)valLEDout8 + (String)valLEDout4 + (String)valLEDout2 + (String)valLEDout1);
+			sClock = GetHexFromByte(DecimalToBinary(currentClockSpeed));
+			
+			Serial.println(sBus + sControl + sOut + sClock);
+		}
 	}
-
 }
 
+String DecimalToBinary(short n) {
+	int binaryNumber[16], num = n;
+	int i = 0;
+	String sOut = "";
+	while (n > 0) {
+		binaryNumber[i] = n % 2;
+		n = n / 2;
+		i++;
+	}
+	for (int j = i - 1; j >= 0; j--)
+	{
+		sOut += binaryNumber[j];
+	}
+	for (short p = 16 - sOut.length(); p > 0; p--)
+	{
+		sOut = '0' + sOut;
+	}
+	return sOut;
+}
 
+String GetHexFromByte(String sBinary)
+{
+	//Better ways to do this with other libraries.
+	//For now, minimal safety code. Expecting a string of 8 ones/zeros, or multiple sets of 8.
+
+	String rest = "" , tmp = "";
+	for (int i = 0; i < sBinary.length(); i += 4)
+	{
+		tmp = sBinary.substring(i, i+4);
+
+		if (tmp == "0000")
+		{
+			rest = rest + "0";
+		}
+		else if (tmp == "0001")
+		{
+			rest = rest + "1";
+		}
+		else if (tmp == "0010")
+		{
+			rest = rest + "2";
+		}
+		else if (tmp == "0011")
+		{
+			rest = rest + "3";
+		}
+		else if (tmp == "0100")
+		{
+			rest = rest + "4";
+		}
+		else if (tmp == "0101")
+		{
+			rest = rest + "5";
+		}
+		else if (tmp == "0110")
+		{
+			rest = rest + "6";
+		}
+		else if (tmp == "0111")
+		{
+			rest = rest + "7";
+		}
+		else if (tmp == "1000")
+		{
+			rest = rest + "8";
+		}
+		else if (tmp == "1001")
+		{
+			rest = rest + "9";
+		}
+		else if (tmp == "1010")
+		{
+			rest = rest + "A";
+		}
+		else if (tmp == "1011")
+		{
+			rest = rest + "B";
+		}
+		else if (tmp == "1100")
+		{
+			rest = rest + "C";
+		}
+		else if (tmp == "1101")
+		{
+			rest = rest + "D";
+		}
+		else if (tmp == "1110")
+		{
+			rest = rest + "E";
+		}
+		else if (tmp == "1111")
+		{
+			rest = rest + "F";
+		}
+	}
+	return rest;
+}
 
 void setRAMCustom()
 {
