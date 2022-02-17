@@ -22,7 +22,7 @@
 
  To use the monitor:
  -Set clock mode switch to automatic
- -Set memory program mode switch to dsiable
+ -Set memory program mode switch to disable
 
  If using an additional Arduino Nano to capture the board clock, code for that Nano is at that bottom of this page.
 */
