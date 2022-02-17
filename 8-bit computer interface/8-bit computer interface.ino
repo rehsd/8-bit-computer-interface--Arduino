@@ -18,7 +18,7 @@
  -Set clock mode switch to manual
  -Set memory program mode switch to enable
  -Set RAM value dip switches to UP (on)
- -Set RAM address value dip switches to UP (up)
+ -Set RAM address value dip switches to UP (on)
 
  To use the monitor:
  -Set clock mode switch to automatic
@@ -30,7 +30,6 @@
 #include<Wire.h>
 
 //const int CONNECTION_RATE = 460800;		//Serial connection speed. Match this to the same const in the Windows application.
-
 
 #define PIN_BUS1 23							//PIN1 (far left) of Bus
 #define PIN_BUS2 25
@@ -486,7 +485,8 @@ void setRAMCustom()
 	interrupts();
 }
 
-void setRAM() {
+//Set default values
+void setRAM() {			
 	//set values as you see appropriate
 	//use to easily load a common set of values for testing
 	//currently using Ben's example of counting up to 255 and back down, from the Conditional jump  instructions video
